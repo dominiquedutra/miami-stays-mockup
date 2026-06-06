@@ -1,6 +1,8 @@
 <!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>South Florida furnished — shortlist (SoFi → Fort Lauderdale)</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400..600&family=Hanken+Grotesk:wght@400..700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{--sand:#f4ece0;--paper:#fbf6ee;--ink:#1c2b2d;--soft:#3c4f50;--ocean:#0e5c63;--coral:#e2613f;--line:#d9ccb8;--gold:#c89b3c;--good:#2f7d4f;--bad:#b1492f}
 *{box-sizing:border-box;margin:0}body{font-family:'Hanken Grotesk',-apple-system,sans-serif;background:var(--sand);color:var(--ink)}
@@ -42,7 +44,10 @@ h1{font-family:'Fraunces',Georgia,serif;font-weight:560;font-size:clamp(1.8rem,4
 <h1>Imóveis mobiliados · South Florida</h1>
 <div class="sub">South of Fifth → Fort Lauderdale · 44 opções · entrada 15/set–16/nov 2026 · clique num card para fotos, notas (Google/Airbnb/VRBO), endereço e reserva direta</div>
 <div class="bar">
-  <span class="lbl">Ordenar:</span>
+  <span class="lbl">Ver:</span>
+  <button class="chip on" data-v="list">▦ Lista</button>
+  <button class="chip" data-v="map">🗺️ Mapa</button>
+  <span class="lbl" style="margin-left:8px">Ordenar:</span>
   <button class="chip on" data-s="price">Menor preço</button>
   <button class="chip" data-s="beach">Praia (carro)</button>
   <button class="chip" data-s="wf">Whole Foods</button>
@@ -54,6 +59,7 @@ h1{font-family:'Fraunces',Georgia,serif;font-weight:560;font-size:clamp(1.8rem,4
   <button class="chip" data-a="South Beach">South Beach</button><button class="chip" data-a="Mid Beach">Mid Beach</button><button class="chip" data-a="North Beach">North Beach</button><button class="chip" data-a="Aventura">Aventura</button><button class="chip" data-a="Fort Lauderdale">Fort Lauderdale</button>
 </div>
 <div class="grid" id="grid"></div>
+<div id="map" style="display:none;height:72vh;border-radius:14px;overflow:hidden;border:1px solid var(--line)"></div>
 <div class="legend">🟢🟡🔴 = reputação da operadora · <b>Notas:</b> <span style="color:#1a73e8">G</span>=Google Places (prédio/arredor) · <span style="color:#e2613f">A</span>=Airbnb · <span style="color:#0e5c63">V</span>=VRBO · <b>Kid-score</b> por reviews (cinza=via operadora) · <b>preço</b>=Blueground (direto costuma ser menor). Mockup compartilhável.</div>
 </div>
 <div class="ov" id="ov"><div class="modal"><span class="close" id="x">×</span><div class="gal" id="gal"></div><div class="mbody" id="mb"></div></div></div>
@@ -99,5 +105,28 @@ function openModal(code){const d=D.find(x=>x.code===code);
 document.querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-s]').forEach(x=>x.classList.remove('on'));b.classList.add('on');sortKey=b.dataset.s;render();});
 document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-a]').forEach(x=>x.classList.remove('on'));b.classList.add('on');area=b.dataset.a;render();});
 document.getElementById('x').onclick=()=>ov.classList.remove('on');ov.onclick=e=>{if(e.target===ov)ov.classList.remove('on')};
+window._open=openModal;
+// browseable map
+const flagHex={g:'#2f7d4f',y:'#c89b3c',r:'#b1492f'};
+let map=null;
+function initMap(){if(map)return;map=L.map('map',{scrollWheelZoom:true}).setView([25.95,-80.16],11);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:20}).addTo(map);
+  const b=[];
+  D.forEach(d=>{b.push([d.lat,d.lng]);
+    const col=flagHex[d.flag[0]]||'#888';
+    const m=L.circleMarker([d.lat,d.lng],{radius:9,color:'#fff',weight:2,fillColor:col,fillOpacity:.95}).addTo(map);
+    const ks=d.kid?(' · 👶 '+d.kid.score):'';
+    const pop='<div style="width:200px;font-family:sans-serif">'+(d.photos[0]?'<img src="'+d.photos[0]+'" style="width:100%;height:110px;object-fit:cover;border-radius:7px">':'')+
+      '<div style="font-weight:700;margin-top:5px">'+d.name+'</div><div style="font-size:12px;color:#555">'+d.beds+'Q/'+d.baths+'B · '+d.neighborhood+'</div>'+
+      '<div style="font-size:12px;margin-top:3px">🏖️ '+(d.beach!=null?d.beach+'min':'—')+' · 🛒 '+(d.wf!=null?d.wf+'min':'—')+(d.google?' · G★'+d.google.rating:'')+ks+'</div>'+
+      '<div style="font-weight:700;color:#0e5c63;font-size:15px;margin-top:3px">$'+d.price.toLocaleString()+'/mês</div>'+
+      '<button onclick="window._open(\''+d.code+'\')" style="margin-top:6px;width:100%;background:#e2613f;color:#fff;border:0;padding:8px;border-radius:8px;font-weight:700;cursor:pointer">Ver detalhes →</button></div>';
+    m.bindPopup(pop);
+  });
+  if(b.length)map.fitBounds(b,{padding:[40,40]});
+}
+document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-v]').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  const mp=b.dataset.v==='map';document.getElementById('grid').style.display=mp?'none':'grid';document.getElementById('map').style.display=mp?'block':'none';
+  if(mp){initMap();setTimeout(()=>map.invalidateSize(),100);}});
 render();
 </script></body></html>
